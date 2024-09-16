@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Wemos D1 Station",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"cmath": "cpp"
+		}
+	}
+}
