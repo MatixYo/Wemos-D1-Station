@@ -73,7 +73,7 @@ const int SDC_PIN = 4; // D4;
 #define HOSTNAME "ESP8266-OTA-"
 
 #define APIKEY "d71da694-100c-40bb-81d9-764263e737b7"
-#define FW_VER "v@0.0.4"
+#define FW_VER "v@1.0.4"
 // OpenWeatherMap Settings
 // Sign up here to get an API key:
 // https://docs.thingpulse.com/how-tos/openweathermap-key/
@@ -98,6 +98,8 @@ String OPEN_WEATHER_MAP_LANGUAGE = "pl";
 const uint8_t MAX_FORECASTS = 4;
 
 const boolean IS_METRIC = true;
+
+const boolean DISABLE_OTA = false;
 
 // Adjust according to your language
 const String WDAY_NAMES[] = {"NIE", "PON", "WTO", "SRO", "CZW", "PIA", "SOB"};
@@ -125,8 +127,6 @@ time_t now;
 // flag changed in the ticker function every 10 minutes
 bool readyForWeatherUpdate = false;
 
-String lastUpdate = "--";
-
 long timeSinceLastWUpdate = 0;
 
 // declaring prototypes
@@ -140,11 +140,13 @@ void drawForecast(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, in
 void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex);
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state);
 void setReadyForWeatherUpdate();
+void autoBrightness(OLEDDisplay *display);
+void otaUpdate();
 
 // Add frames
 // this array keeps function pointers to all frames
 // frames are the single views that slide from right to left
-FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast};
+FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast, drawMessage};
 int numberOfFrames = sizeof(frames) / sizeof(FrameCallback);
 
 OverlayCallback overlays[] = {drawHeaderOverlay};
@@ -176,7 +178,9 @@ void setup()
   // or use this for auto generated name ESP + ChipID
   wifiManager.autoConnect();
 
+  // Initiate OTA
   OTADRIVE.setInfo(APIKEY, FW_VER);
+  OTADRIVE.onUpdateFirmwareProgress(onUpdateProgress);
 
   // Manual Wifi
   // WiFi.begin(WIFI_SSID, WIFI_PWD);
@@ -202,6 +206,8 @@ void setup()
   // Get time from network time service
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
 
+  autoBrightness(&display);
+
   ui.setTargetFPS(60);
 
   ui.setActiveSymbol(activeSymbole);
@@ -222,10 +228,14 @@ void setup()
 
   ui.setOverlays(overlays, numberOfOverlays);
 
+  ui.setTimePerFrame(8000);
+
   // Inital UI takes care of initalising the display too.
   ui.init();
 
   Serial.println("");
+
+  otaUpdate();
 
   updateData(&display);
 }
@@ -279,13 +289,30 @@ void drawProgress(OLEDDisplay *display, int percentage, String label)
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(ArialMT_Plain_10);
   display->drawString(64, 10, label);
-  display->drawProgressBar(2, 28, 124, 10, percentage);
+  display->drawString(64, 54, "Wersja: " FW_VER);
+  display->drawProgressBar(2, 30, 124, 10, percentage);
   display->display();
+}
+
+void onUpdateProgress(int progress, int totalt)
+{
+  static int last = 0;
+  int progressPercent = (100 * progress) / totalt;
+  Serial.print("*");
+  if (last != progressPercent)
+  {
+    drawProgress(&display, progressPercent, "Aktualizuje soft...");
+    // print every 10%
+    if (progressPercent % 10 == 0)
+    {
+      Serial.printf("%d", progressPercent);
+    }
+  }
+  last = progressPercent;
 }
 
 void updateData(OLEDDisplay *display)
 {
-  drawProgress(display, 10, "Aktualizuje czas...");
   drawProgress(display, 30, "Aktualizuje pogode...");
   currentWeatherClient.setMetric(IS_METRIC);
   currentWeatherClient.setLanguage(OPEN_WEATHER_MAP_LANGUAGE);
@@ -379,12 +406,23 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state)
   display->drawHorizontalLine(0, 52, 128);
 }
 
+int counter = 0;
+unsigned long lastMessageUpdate = millis();
+unsigned long updateMessageEvery = 1000;
+String messages[] = {"Swieci slonce", "Pada cieply deszcz", "Jest tecza", "Nie ma burzy", "Jest cieplo"};
+
 void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(ArialMT_Plain_10);
-  display->drawString(64, 20, "Z Toba zawsze");
-  display->drawString(64, 35, "Swieci sloneczko");
+  display->drawString(64 + x, 9 + y, "Z Toba zawsze");
+  display->drawString(64 + x, 24 + y, messages[counter]);
+
+  if ((millis() - lastMessageUpdate) > updateMessageEvery)
+  {
+    lastMessageUpdate = millis();
+    counter = (counter + 1) % (sizeof(messages) / sizeof(String));
+  }
 }
 
 void setReadyForWeatherUpdate()
@@ -403,7 +441,7 @@ void configModeCallback(WiFiManager *myWiFiManager)
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setFont(ArialMT_Plain_10);
   display.drawString(64, 10, "Prosze sie polaczyc z WiFi");
-  display.drawString(64, 30, myWiFiManager->getConfigPortalSSID());
+  display.drawString(64, 25, myWiFiManager->getConfigPortalSSID());
   display.drawString(64, 40, "aby sie polaczyc z pogoda");
   display.display();
 }
@@ -411,7 +449,7 @@ void configModeCallback(WiFiManager *myWiFiManager)
 void otaUpdate()
 {
   // Every 1h
-  if (!OTADRIVE.timeTick(3600))
+  if (!OTADRIVE.timeTick(3600) || DISABLE_OTA)
     return;
   Serial.println("Checking for updates");
   auto inf = OTADRIVE.updateFirmwareInfo();
