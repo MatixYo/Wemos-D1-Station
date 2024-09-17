@@ -47,7 +47,8 @@ See more at https://thingpulse.com
 #include "WeatherStationImages.h"
 
 #include <WiFiManager.h>
-#include <ArduinoOTA.h>
+
+#include <otadrive_esp.h>
 
 /***************************
  * Begin Settings
@@ -71,10 +72,12 @@ const int SDC_PIN = 4; // D4;
 
 #define HOSTNAME "ESP8266-OTA-"
 
+#define APIKEY "d71da694-100c-40bb-81d9-764263e737b7"
+#define FW_VER "v@0.0.4"
 // OpenWeatherMap Settings
 // Sign up here to get an API key:
 // https://docs.thingpulse.com/how-tos/openweathermap-key/
-String OPEN_WEATHER_MAP_APP_ID = "f68454118a2920dc2af974ac6ca49050";
+String OPEN_WEATHER_MAP_APP_ID = "839b1ac8f787fbda6d1db8431b0513c0";
 /*
 Go to https://openweathermap.org/find?q= and search for a location. Go through the
 result set and select the entry closest to the actual location you want to display
@@ -173,6 +176,8 @@ void setup()
   // or use this for auto generated name ESP + ChipID
   wifiManager.autoConnect();
 
+  OTADRIVE.setInfo(APIKEY, FW_VER);
+
   // Manual Wifi
   // WiFi.begin(WIFI_SSID, WIFI_PWD);
   String hostname(HOSTNAME);
@@ -193,6 +198,7 @@ void setup()
 
     counter++;
   }
+
   // Get time from network time service
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
 
@@ -222,18 +228,13 @@ void setup()
   Serial.println("");
 
   updateData(&display);
-
-  // Enable OTA update
-  ArduinoOTA.begin();
-  Serial.println("OTA IP: ");
-  Serial.println(ArduinoOTA.getHostname());
 }
 
 void loop()
 {
-  ArduinoOTA.handle();
-
   autoBrightness(&display);
+
+  otaUpdate();
 
   if (millis() - timeSinceLastWUpdate > (1000L * UPDATE_INTERVAL_SECS))
   {
@@ -405,4 +406,22 @@ void configModeCallback(WiFiManager *myWiFiManager)
   display.drawString(64, 30, myWiFiManager->getConfigPortalSSID());
   display.drawString(64, 40, "aby sie polaczyc z pogoda");
   display.display();
+}
+
+void otaUpdate()
+{
+  // Every 1h
+  if (!OTADRIVE.timeTick(3600))
+    return;
+  Serial.println("Checking for updates");
+  auto inf = OTADRIVE.updateFirmwareInfo();
+  if (inf.available)
+  {
+    Serial.printf("\nNew version available, %dBytes, %s\n", inf.size, inf.version.c_str());
+    OTADRIVE.updateFirmware();
+  }
+  else
+  {
+    Serial.println("\nNo newer version\n");
+  }
 }
