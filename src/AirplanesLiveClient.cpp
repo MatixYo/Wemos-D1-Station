@@ -193,7 +193,7 @@ void AirplanesLiveClient::updateData(double lat, double lon, int radius)
     }
 
     this->hasVisibleAirplane = closestIndex != -1;
-    if (index == -1)
+    if (!this->hasVisibleAirplane)
     {
         Serial.println("[AirplanesLiveClient] No aircraft found.");
         return;

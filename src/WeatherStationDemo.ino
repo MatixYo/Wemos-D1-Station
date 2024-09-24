@@ -53,7 +53,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.2"
+#define FW_VER "v@1.1.4"
 
 /***************************
  * Begin Settings
