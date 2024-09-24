@@ -1,43 +1,22 @@
-/**The MIT License (MIT)
-
-Copyright (c) 2018 by Daniel Eichhorn - ThingPulse
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-See more at https://thingpulse.com
-*/
-
+# 1 "/var/folders/rd/t47ysqws1z37d388k0z_qjb40000gn/T/tmpydipelzt"
+#include <Arduino.h>
+# 1 "/Users/matix/Documents/PlatformIO/Projects/Wemos D1 Station/src/WeatherStationDemo.ino"
+# 26 "/Users/matix/Documents/PlatformIO/Projects/Wemos D1 Station/src/WeatherStationDemo.ino"
 #include <Arduino.h>
 #include <config.h>
 
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
-#include <coredecls.h> // settimeofday_cb()
+#include <coredecls.h>
 #else
 #include <WiFi.h>
 #endif
 #include <ESPHTTPClient.h>
 #include <JsonListener.h>
 
-// time
-#include <time.h>     // time() ctime()
-#include <sys/time.h> // struct timeval
+
+#include <time.h>
+#include <sys/time.h>
 
 #include "SSD1306Wire.h"
 #include "OLEDDisplayUi.h"
@@ -53,63 +32,45 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-/***************************
- * Begin Settings
- **************************/
 
-#define TZ 1      // (utc+) TZ in hours
-#define DST_MN 60 // use 60mn for summer time in some countries
 
-// Setup
-const int UPDATE_INTERVAL_SECS = 20 * 60; // Update every 20 minutes
 
-const int UPDATE_AIRPLANES_INTERVAL_SECS = 30; // Every 30 seconds
 
-// Display Settings
+#define TZ 1
+#define DST_MN 60
+
+
+const int UPDATE_INTERVAL_SECS = 20 * 60;
+
+const int UPDATE_AIRPLANES_INTERVAL_SECS = 30;
+
+
 const int I2C_DISPLAY_ADDRESS = 0x3c;
 #if defined(ESP8266)
 const int SDA_PIN = D2;
 const int SDC_PIN = D1;
 #else
-const int SDA_PIN = 5; // D3;
-const int SDC_PIN = 4; // D4;
+const int SDA_PIN = 5;
+const int SDC_PIN = 4;
 #endif
 
 #define FW_VER "v@1.0.4"
-// OpenWeatherMap Settings
-// Sign up here to get an API key:
-// https://docs.thingpulse.com/how-tos/openweathermap-key/
-/*
-Go to https://openweathermap.org/find?q= and search for a location. Go through the
-result set and select the entry closest to the actual location you want to display
-data for. It'll be a URL like https://openweathermap.org/city/2657896. The number
-at the end is what you assign to the constant below.
- */
-
-// Pick a language code from this list:
-// Arabic - ar, Bulgarian - bg, Catalan - ca, Czech - cz, German - de, Greek - el,
-// English - en, Persian (Farsi) - fa, Finnish - fi, French - fr, Galician - gl,
-// Croatian - hr, Hungarian - hu, Italian - it, Japanese - ja, Korean - kr,
-// Latvian - la, Lithuanian - lt, Macedonian - mk, Dutch - nl, Polish - pl,
-// Portuguese - pt, Romanian - ro, Russian - ru, Swedish - se, Slovak - sk,
-// Slovenian - sl, Spanish - es, Turkish - tr, Ukrainian - ua, Vietnamese - vi,
-// Chinese Simplified - zh_cn, Chinese Traditional - zh_tw.
-
+# 98 "/Users/matix/Documents/PlatformIO/Projects/Wemos D1 Station/src/WeatherStationDemo.ino"
 const uint8_t MAX_FORECASTS = 4;
 
 const boolean IS_METRIC = true;
 
 const boolean DISABLE_OTA = true;
 
-// Adjust according to your language
+
 const String WDAY_NAMES[] = {"NIE", "PON", "WTO", "SRO", "CZW", "PIA", "SOB"};
 const String MONTH_NAMES[] = {"STY", "LUT", "MAR", "KWI", "MAJ", "CZE", "LIP", "SIE", "WRZ", "PAŹ", "LIS", "GRU"};
 
-/***************************
- * End Settings
- **************************/
-// Initialize the oled display for address 0x3c
-// sda-pin=14 and sdc-pin=12
+
+
+
+
+
 SSD1306Wire display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
 OLEDDisplayUi ui(&display);
 
@@ -126,7 +87,7 @@ AirplanesLiveClient airplanesClient;
 #define DST_SEC ((DST_MN) * 60)
 time_t now;
 
-// flag changed in the ticker function every 10 minutes
+
 bool readyForWeatherUpdate = false;
 
 bool readyForAirplaneUpdate = false;
@@ -135,7 +96,7 @@ long timeSinceLastWUpdate = 0;
 
 long timeSinceLastAUpdate = 0;
 
-// declaring prototypes
+
 void configModeCallback(WiFiManager *myWiFiManager);
 void drawProgress(OLEDDisplay *display, int percentage, String label);
 void updateData(OLEDDisplay *display);
@@ -149,47 +110,51 @@ void drawAirplane(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, in
 void autoBrightness(OLEDDisplay *display);
 void otaUpdate();
 
-// Add frames
-// this array keeps function pointers to all frames
-// frames are the single views that slide from right to left
+
+
+
 FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast};
-FrameCallback framesAirplane[] = {drawDateTime, drawAirplane}; //, drawCurrentWeather, drawForecast};
+FrameCallback framesAirplane[] = {drawDateTime, drawAirplane};
 
 OverlayCallback overlays[] = {drawHeaderOverlay};
 int numberOfOverlays = 1;
-
+void setup();
+void loop();
+void onUpdateProgress(int progress, int totalt);
+void updateAirplaneData(OLEDDisplay *display);
+#line 161 "/Users/matix/Documents/PlatformIO/Projects/Wemos D1 Station/src/WeatherStationDemo.ino"
 void setup()
 {
   Serial.begin(115200);
   Serial.println();
   Serial.println();
 
-  // initialize dispaly
+
   display.init();
   display.clear();
   display.display();
 
-  // display.flipScreenVertically();
+
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setContrast(255);
 
-  // WiFiManager
-  // Local intialization. Once its business is done, there is no need to keep it around
+
+
   WiFiManager wifiManager;
-  // Uncomment for testing wifi manager
-  // wifiManager.resetSettings();
+
+
   wifiManager.setAPCallback(configModeCallback);
 
-  // or use this for auto generated name ESP + ChipID
+
   wifiManager.autoConnect();
 
-  // Initiate OTA
+
   OTADRIVE.setInfo(APIKEY, FW_VER);
   OTADRIVE.onUpdateFirmwareProgress(onUpdateProgress);
 
-  // Manual Wifi
-  // WiFi.begin(WIFI_SSID, WIFI_PWD);
+
+
   String hostname(HOSTNAME);
   hostname += String(ESP.getChipId(), HEX);
   WiFi.hostname(hostname);
@@ -209,7 +174,7 @@ void setup()
     counter++;
   }
 
-  // Get time from network time service
+
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
 
   autoBrightness(&display);
@@ -219,15 +184,15 @@ void setup()
   ui.setActiveSymbol(activeSymbole);
   ui.setInactiveSymbol(inactiveSymbole);
 
-  // You can change this to
-  // TOP, LEFT, BOTTOM, RIGHT
+
+
   ui.setIndicatorPosition(BOTTOM);
 
-  // Defines where the first frame is located in the bar.
+
   ui.setIndicatorDirection(LEFT_RIGHT);
 
-  // You can change the transition that is used
-  // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
+
+
   ui.setFrameAnimation(SLIDE_LEFT);
 
   ui.setFrames(frames, 3);
@@ -236,7 +201,7 @@ void setup()
 
   ui.setTimePerFrame(8000);
 
-  // Inital UI takes care of initalising the display too.
+
   ui.init();
 
   Serial.println("");
@@ -279,9 +244,9 @@ void loop()
 
   if (remainingTimeBudget > 0)
   {
-    // You can do some work here
-    // Don't do stuff if you are below your
-    // time budget.
+
+
+
     delay(remainingTimeBudget);
   }
 }
@@ -320,7 +285,7 @@ void onUpdateProgress(int progress, int totalt)
   if (last != progressPercent)
   {
     drawProgress(&display, progressPercent, "Aktualizuje soft...");
-    // print every 10%
+
     if (progressPercent % 10 == 0)
     {
       Serial.printf("%d", progressPercent);
@@ -429,11 +394,11 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state)
   display->setColor(WHITE);
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->drawString(0, 54, String(buff));
+  display->drawString(0, 55, String(buff));
   display->setTextAlignment(TEXT_ALIGN_RIGHT);
   String temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
-  display->drawString(128, 54, temp);
-  display->drawHorizontalLine(0, 55, 128);
+  display->drawString(128, 55, temp);
+  display->drawHorizontalLine(0, 54, 128);
 }
 
 int counter = 0;
@@ -472,14 +437,14 @@ void drawAirplane(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, in
   display->drawString(64 + x, 10 + y, String(airplane.alt_baro) + "ft");
   display->drawString(x, 30 + y, String(airplane.track) + "°");
 
-  // drawHeading(display, 78, 52, adsbClient.getHeading());
+
 }
 
 void configModeCallback(WiFiManager *myWiFiManager)
 {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  // if you used auto generated SSID, print it
+
   Serial.println(myWiFiManager->getConfigPortalSSID());
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -492,7 +457,7 @@ void configModeCallback(WiFiManager *myWiFiManager)
 
 void otaUpdate()
 {
-  // Every 1h
+
   if (!OTADRIVE.timeTick(3600) || DISABLE_OTA)
     return;
   Serial.println("Checking for updates");
