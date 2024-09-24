@@ -60,11 +60,6 @@ See more at https://thingpulse.com
 #define TZ 1      // (utc+) TZ in hours
 #define DST_MN 60 // use 60mn for summer time in some countries
 
-// Setup
-const int UPDATE_INTERVAL_SECS = 20 * 60; // Update every 20 minutes
-
-const int UPDATE_AIRPLANES_INTERVAL_SECS = 30; // Every 30 seconds
-
 // Display Settings
 const int I2C_DISPLAY_ADDRESS = 0x3c;
 #if defined(ESP8266)
@@ -75,7 +70,7 @@ const int SDA_PIN = 5; // D3;
 const int SDC_PIN = 4; // D4;
 #endif
 
-#define FW_VER "v@1.0.4"
+#define FW_VER "v@1.1.0"
 // OpenWeatherMap Settings
 // Sign up here to get an API key:
 // https://docs.thingpulse.com/how-tos/openweathermap-key/
@@ -99,7 +94,7 @@ const uint8_t MAX_FORECASTS = 4;
 
 const boolean IS_METRIC = true;
 
-const boolean DISABLE_OTA = true;
+const boolean DISABLE_OTA = false;
 
 // Adjust according to your language
 const String WDAY_NAMES[] = {"NIE", "PON", "WTO", "SRO", "CZW", "PIA", "SOB"};
@@ -124,6 +119,9 @@ AirplanesLiveClient airplanesClient;
 #define TZ_MN ((TZ) * 60)
 #define TZ_SEC ((TZ) * 3600)
 #define DST_SEC ((DST_MN) * 60)
+
+const float pi = 3.141;
+
 time_t now;
 
 // flag changed in the ticker function every 10 minutes
@@ -145,15 +143,18 @@ void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t
 void drawForecast(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex);
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state);
-void drawAirplane(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
+void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
+void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void autoBrightness(OLEDDisplay *display);
+void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius);
+String replaceChars(String input);
 void otaUpdate();
 
 // Add frames
 // this array keeps function pointers to all frames
 // frames are the single views that slide from right to left
-FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast};
-FrameCallback framesAirplane[] = {drawDateTime, drawAirplane}; //, drawCurrentWeather, drawForecast};
+FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast, drawMessage};
+FrameCallback framesAirplane[] = {drawDateTime, drawAirplane1, drawAirplane2, drawCurrentWeather, drawForecast};
 
 OverlayCallback overlays[] = {drawHeaderOverlay};
 int numberOfOverlays = 1;
@@ -230,7 +231,7 @@ void setup()
   // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
   ui.setFrameAnimation(SLIDE_LEFT);
 
-  ui.setFrames(frames, 3);
+  ui.setFrames(frames, 4);
 
   ui.setOverlays(overlays, numberOfOverlays);
 
@@ -297,7 +298,7 @@ struct tm *getTimeInfo()
 void autoBrightness(OLEDDisplay *display)
 {
   int hour = getTimeInfo()->tm_hour;
-  bool isNight = hour < 8 || hour > 22;
+  bool isNight = (hour < 8 || hour > 22) && time(nullptr) > 100000;
   display->setBrightness(isNight ? 1 : 255);
 }
 
@@ -350,13 +351,16 @@ void updateData(OLEDDisplay *display)
 void updateAirplaneData(OLEDDisplay *display)
 {
   drawProgress(display, 30, "Aktualizuje samoloty...");
-  airplanesClient.updateData(LAT, LNG, RADIUS);
+
+  float randomLat = LAT + (float)random(-100, 100) / 100000;
+  float randomLon = LON + (float)random(-100, 100) / 100000;
+  airplanesClient.updateData(randomLat, randomLon, RADIUS);
 
   readyForAirplaneUpdate = false;
   drawProgress(display, 100, "Gotowe...");
 
   bool hasAirplanes = airplanesClient.hasAirplane();
-  ui.setFrames(hasAirplanes ? framesAirplane : frames, hasAirplanes ? 2 : 3);
+  ui.setFrames(hasAirplanes ? framesAirplane : frames, hasAirplanes ? 5 : 4);
 }
 
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
@@ -380,9 +384,11 @@ void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, in
 
 void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
+  String description = replaceChars(currentWeather.description);
+
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 38 + y, currentWeather.description);
+  display->drawString(64 + x, 38 + y, description);
 
   display->setFont(ArialMT_Plain_24);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
@@ -455,7 +461,21 @@ void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int
   }
 }
 
-void drawAirplane(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
+void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius)
+{
+  int degrees[] = {0, 165, 195, 0};
+  display->drawCircle(x, y, radius + 3);
+  for (int i = 0; i < 3; i++)
+  {
+    int x1 = cos((-450 + (heading + degrees[i])) * pi / 180.0) * radius + x;
+    int y1 = sin((-450 + (heading + degrees[i])) * pi / 180.0) * radius + y;
+    int x2 = cos((-450 + (heading + degrees[i + 1])) * pi / 180.0) * radius + x;
+    int y2 = sin((-450 + (heading + degrees[i + 1])) * pi / 180.0) * radius + y;
+    display->drawLine(x1, y1, x2, y2);
+  }
+}
+
+void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
   if (!airplanesClient.hasAirplane())
     return;
@@ -464,15 +484,33 @@ void drawAirplane(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, in
 
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
-  display->drawString(x, y, "Dys:");
-  display->drawString(64 + x, y, "Wys:");
-  display->drawString(x, 20 + y, "Hdg:");
-  display->setFont(ArialMT_Plain_10);
-  display->drawString(x, 10 + y, String(airplane.distance, 0) + "km");
-  display->drawString(64 + x, 10 + y, String(airplane.alt_baro) + "ft");
-  display->drawString(x, 30 + y, String(airplane.track) + "°");
+  display->drawString(x, y, "Typ:");
+  display->drawString(x, 26 + y, "Znaki:");
+  display->setFont(ArialMT_Plain_16);
+  display->drawString(x, 10 + y, airplane.t);
+  display->drawString(x, 36 + y, airplane.r);
 
-  // drawHeading(display, 78, 52, adsbClient.getHeading());
+  drawHeading(display, x + 112, y + 26, airplane.track, 12);
+}
+
+void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
+{
+  if (!airplanesClient.hasAirplane())
+    return;
+
+  const AirplaneData &airplane = airplanesClient.getVisibleAircraft();
+
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_10);
+  display->drawString(x, y, "Odleglosc:");
+  display->drawString(x, 27 + y, "Wysokosc:");
+  display->drawString(66 + x, y, "Kurs:");
+  display->drawString(66 + x, 27 + y, "Predkosc:");
+  display->setFont(ArialMT_Plain_16);
+  display->drawString(x, 10 + y, String(airplane.distance, 0) + "km");
+  display->drawString(x, 37 + y, String(airplane.alt_baro) + "ft");
+  display->drawString(66 + x, 10 + y, String(airplane.track) + "°");
+  display->drawString(66 + x, 37 + y, String(airplane.gs) + "kts");
 }
 
 void configModeCallback(WiFiManager *myWiFiManager)
@@ -506,4 +544,26 @@ void otaUpdate()
   {
     Serial.println("\nNo newer version\n");
   }
+}
+
+String replaceChars(String input)
+{
+  // Define Polish and English character mappings
+  String polishChars[] = {"ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż",
+                          "Ą", "Ć", "Ę", "Ł", "Ń", "Ó", "Ś", "Ź", "Ż"};
+  String englishChars[] = {"a", "c", "e", "l", "n", "o", "s", "z", "z",
+                           "A", "C", "E", "L", "N", "O", "S", "Z", "Z"};
+
+  // Iterate through the input string and replace Polish characters
+  for (unsigned int i = 0; i < input.length(); i++)
+  {
+    for (unsigned int j = 0; j < sizeof(polishChars) / sizeof(polishChars[0]); j++)
+    {
+      if (input.indexOf(polishChars[j]) != -1)
+      {
+        input.replace(polishChars[j], englishChars[j]);
+      }
+    }
+  }
+  return input; // Return the modified string
 }

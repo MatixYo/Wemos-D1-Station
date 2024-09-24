@@ -31,20 +31,17 @@ struct AirplaneData
 class AirplanesLiveClient
 {
 private:
-    double lat;
-    double lng;
-    int radius;
     bool hasVisibleAirplane;
     AirplaneData visibleAircraft;
 
-    String fetchApi(double lat, double lng, int radius);
+    String fetchApi(double lat, double lon, int radius);
     double calculateDistance(double lat1, double lon1, double lat2, double lon2);
-    void updateDistance(JsonDocument *ac);
+    void updateDistance(JsonDocument *ac, double lat, double lon);
     AirplaneData assignJsonToStruct(JsonVariant &ac);
 
 public:
     AirplanesLiveClient();
-    void updateData(double lat, double lng, int radius);
+    void updateData(double lat, double lon, int radius);
     const AirplaneData &getVisibleAircraft() const;
     bool hasAirplane();
 };

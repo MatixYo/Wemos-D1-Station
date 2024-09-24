@@ -17,11 +17,11 @@ bool AirplanesLiveClient::hasAirplane()
     return this->hasVisibleAirplane;
 }
 
-String AirplanesLiveClient::fetchApi(double lat, double lng, int radius)
+String AirplanesLiveClient::fetchApi(double lat, double lon, int radius)
 {
     HTTPClient http;
 
-    String url = "https://api.airplanes.live/v2/point/" + String(lat, 4) + "/" + String(lng, 4) + "/" + String(radius);
+    String url = "https://api.airplanes.live/v2/point/" + String(lat, 6) + "/" + String(lon, 6) + "/" + String(radius);
 
     std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
     client->setInsecure();
@@ -77,18 +77,20 @@ double AirplanesLiveClient::calculateDistance(double lat1, double lon1, double l
     // Calculate the distance
     double distance = EARTH_RADIUS_KM * c;
 
+    Serial.println("[AirplanesLiveClient] Calculated distance..." + String(lat1) + "," + String(lon1) + " to " + String(lat2) + "," + String(lon2) + " = " + String(distance) + "km");
+
     return distance; // Distance in kilometers
 }
 
-void AirplanesLiveClient::updateDistance(JsonDocument *doc)
+void AirplanesLiveClient::updateDistance(JsonDocument *doc, double lat, double lon)
 {
     for (JsonVariant ac : (*doc)["ac"].as<JsonArray>())
     {
         if (ac.containsKey("lat") && ac.containsKey("lon"))
         {
-            double lat = ac["lat"].as<double>();
-            double lng = ac["lon"].as<double>();
-            double distance = calculateDistance(lat, lng, this->lat, this->lng);
+            double acLat = ac["lat"].as<double>();
+            double acLon = ac["lon"].as<double>();
+            double distance = calculateDistance(lat, lon, acLat, acLon);
             ac["distance"] = distance;
         }
         else
@@ -163,15 +165,15 @@ AirplaneData AirplanesLiveClient::assignJsonToStruct(JsonVariant &airplane)
     return airplaneData; // Return the filled structure
 }
 
-void AirplanesLiveClient::updateData(double lat, double lng, int radius)
+void AirplanesLiveClient::updateData(double lat, double lon, int radius)
 {
     JsonDocument doc;
-    String json = this->fetchApi(lat, lng, radius);
+    String json = this->fetchApi(lat, lon, radius);
     deserializeJson(doc, json);
 
     Serial.println("[AirplanesLiveClient] Total aircraft: " + String(doc["ac"].size()));
 
-    this->updateDistance(&doc);
+    this->updateDistance(&doc, lat, lon);
 
     // Find doc["ac"] with lowest ["distance"]
     double minDistance = std::numeric_limits<double>::max();
