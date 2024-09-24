@@ -53,6 +53,8 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
+#define FW_VER "v@1.1.2"
+
 /***************************
  * Begin Settings
  **************************/
@@ -69,8 +71,6 @@ const int SDC_PIN = D1;
 const int SDA_PIN = 5; // D3;
 const int SDC_PIN = 4; // D4;
 #endif
-
-#define FW_VER "v@1.1.0"
 // OpenWeatherMap Settings
 // Sign up here to get an API key:
 // https://docs.thingpulse.com/how-tos/openweathermap-key/
