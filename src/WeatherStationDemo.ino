@@ -53,7 +53,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.4"
+#define FW_VER "v@1.1.5"
 
 /***************************
  * Begin Settings
@@ -133,6 +133,8 @@ long timeSinceLastWUpdate = 0;
 
 long timeSinceLastAUpdate = 0;
 
+int hadAirplanes = -1;
+
 // declaring prototypes
 void configModeCallback(WiFiManager *myWiFiManager);
 void drawProgress(OLEDDisplay *display, int percentage, String label);
@@ -148,12 +150,13 @@ void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
 void autoBrightness(OLEDDisplay *display);
 void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius);
 String replaceChars(String input);
+void updateDisplayedFrames();
 void otaUpdate();
 
 // Add frames
 // this array keeps function pointers to all frames
 // frames are the single views that slide from right to left
-FrameCallback frames[] = {drawDateTime, drawCurrentWeather, drawForecast, drawMessage};
+FrameCallback framesNormal[] = {drawDateTime, drawCurrentWeather, drawForecast, drawMessage};
 FrameCallback framesAirplane[] = {drawDateTime, drawAirplane1, drawAirplane2, drawCurrentWeather, drawForecast};
 
 OverlayCallback overlays[] = {drawHeaderOverlay};
@@ -231,7 +234,7 @@ void setup()
   // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
   ui.setFrameAnimation(SLIDE_LEFT);
 
-  ui.setFrames(frames, 4);
+  updateDisplayedFrames();
 
   ui.setOverlays(overlays, numberOfOverlays);
 
@@ -284,6 +287,19 @@ void loop()
     // Don't do stuff if you are below your
     // time budget.
     delay(remainingTimeBudget);
+  }
+}
+
+void updateDisplayedFrames()
+{
+  int hasAirplanes = airplanesClient.hasAirplane();
+
+  int framesCount = (hasAirplanes ? sizeof(framesAirplane) : sizeof(framesNormal)) / sizeof(FrameCallback);
+
+  if (hasAirplanes != hadAirplanes)
+  {
+    hadAirplanes = hasAirplanes;
+    ui.setFrames(hasAirplanes ? framesAirplane : framesNormal, framesCount);
   }
 }
 
@@ -350,17 +366,13 @@ void updateData(OLEDDisplay *display)
 
 void updateAirplaneData(OLEDDisplay *display)
 {
-  drawProgress(display, 30, "Aktualizuje samoloty...");
-
   float randomLat = LAT + (float)random(-100, 100) / 100000;
   float randomLon = LON + (float)random(-100, 100) / 100000;
   airplanesClient.updateData(randomLat, randomLon, RADIUS);
 
   readyForAirplaneUpdate = false;
-  drawProgress(display, 100, "Gotowe...");
 
-  bool hasAirplanes = airplanesClient.hasAirplane();
-  ui.setFrames(hasAirplanes ? framesAirplane : frames, hasAirplanes ? 5 : 4);
+  updateDisplayedFrames();
 }
 
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
@@ -463,8 +475,9 @@ void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int
 
 void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius)
 {
-  int degrees[] = {0, 165, 195, 0};
-  display->drawCircle(x, y, radius + 3);
+  int diff = 40;
+  int degrees[] = {0, 180 - diff / 2, 180 + diff / 2, 0};
+  display->drawCircle(x, y, radius + 2);
   for (int i = 0; i < 3; i++)
   {
     int x1 = cos((-450 + (heading + degrees[i])) * pi / 180.0) * radius + x;
@@ -482,15 +495,17 @@ void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
 
   const AirplaneData &airplane = airplanesClient.getVisibleAircraft();
 
+  String desc = airplane.desc.length() > 0 ? airplane.desc : airplane.t;
+
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
   display->drawString(x, y, "Typ:");
   display->drawString(x, 26 + y, "Znaki:");
   display->setFont(ArialMT_Plain_16);
-  display->drawString(x, 10 + y, airplane.t);
+  display->drawString(x, 10 + y, desc);
   display->drawString(x, 36 + y, airplane.r);
 
-  drawHeading(display, x + 112, y + 26, airplane.track, 12);
+  drawHeading(display, x + 112, y + 40, airplane.track, 10);
 }
 
 void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)

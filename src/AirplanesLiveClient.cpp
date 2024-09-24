@@ -124,6 +124,7 @@ AirplaneData AirplanesLiveClient::assignJsonToStruct(JsonVariant &airplane)
     if (airplane.containsKey("desc"))
     {
         airplaneData.desc = airplane["desc"].as<const char *>();
+        airplaneData.desc.trim();
     }
     if (airplane.containsKey("alt_baro"))
     {
