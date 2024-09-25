@@ -53,7 +53,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.5"
+#define FW_VER "v@1.1.6"
 
 /***************************
  * Begin Settings
@@ -149,6 +149,7 @@ void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
 void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void autoBrightness(OLEDDisplay *display);
 void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius);
+String formatFlightLevel(int ft);
 String replaceChars(String input);
 void updateDisplayedFrames();
 void otaUpdate();
@@ -238,7 +239,7 @@ void setup()
 
   ui.setOverlays(overlays, numberOfOverlays);
 
-  ui.setTimePerFrame(8000);
+  ui.setTimePerFrame(9000);
 
   // Inital UI takes care of initalising the display too.
   ui.init();
@@ -488,6 +489,13 @@ void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius)
   }
 }
 
+String formatFlightLevel(int ft)
+{
+  return ft < 8000
+             ? (String(ft) + "ft")
+             : ("FL" + String(ft / 100));
+}
+
 void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
   if (!airplanesClient.hasAirplane())
@@ -523,7 +531,7 @@ void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
   display->drawString(66 + x, 27 + y, "Predkosc:");
   display->setFont(ArialMT_Plain_16);
   display->drawString(x, 10 + y, String(airplane.distance, 0) + "km");
-  display->drawString(x, 37 + y, String(airplane.alt_baro) + "ft");
+  display->drawString(x, 37 + y, formatFlightLevel(airplane.alt_baro));
   display->drawString(66 + x, 10 + y, String(airplane.track) + "°");
   display->drawString(66 + x, 37 + y, String(airplane.gs) + "kts");
 }
