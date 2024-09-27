@@ -53,7 +53,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.6"
+#define FW_VER "v@1.1.7"
 
 /***************************
  * Begin Settings
@@ -100,6 +100,8 @@ const boolean DISABLE_OTA = false;
 const String WDAY_NAMES[] = {"NIE", "PON", "WTO", "SRO", "CZW", "PIA", "SOB"};
 const String MONTH_NAMES[] = {"STY", "LUT", "MAR", "KWI", "MAJ", "CZE", "LIP", "SIE", "WRZ", "PAŹ", "LIS", "GRU"};
 
+const float DEG2RAD = M_PI / 180.0;
+
 /***************************
  * End Settings
  **************************/
@@ -119,8 +121,6 @@ AirplanesLiveClient airplanesClient;
 #define TZ_MN ((TZ) * 60)
 #define TZ_SEC ((TZ) * 3600)
 #define DST_SEC ((DST_MN) * 60)
-
-const float pi = 3.141;
 
 time_t now;
 
@@ -147,9 +147,13 @@ void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex);
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state);
 void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
+int16_t *calculateLineCoords(int16_t x2, int16_t y2, float angle, int16_t length);
 void autoBrightness(OLEDDisplay *display);
+
+void drawArrow(OLEDDisplay *display, int16_t x0, int16_t y0, int16_t x1, int16_t y1);
 void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius);
-String formatFlightLevel(int ft);
+void drawAltitude(OLEDDisplay *display, int x, int y, AirplaneData airplane);
+
 String replaceChars(String input);
 void updateDisplayedFrames();
 void otaUpdate();
@@ -212,7 +216,7 @@ void setup()
     display.display();
 
     counter++;
-  }
+  };
 
   // Get time from network time service
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
@@ -234,12 +238,12 @@ void setup()
   // You can change the transition that is used
   // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
   ui.setFrameAnimation(SLIDE_LEFT);
+  ui.setTimePerTransition(300);
+  ui.setTimePerFrame(9000);
 
   updateDisplayedFrames();
 
   ui.setOverlays(overlays, numberOfOverlays);
-
-  ui.setTimePerFrame(9000);
 
   // Inital UI takes care of initalising the display too.
   ui.init();
@@ -362,13 +366,13 @@ void updateData(OLEDDisplay *display)
 
   readyForWeatherUpdate = false;
   drawProgress(display, 100, "Gotowe...");
-  delay(1000);
+  delay(500);
 }
 
 void updateAirplaneData(OLEDDisplay *display)
 {
-  float randomLat = LAT + (float)random(-100, 100) / 100000;
-  float randomLon = LON + (float)random(-100, 100) / 100000;
+  float randomLat = LAT + (float)random(-100, 100) / 1000000;
+  float randomLon = LON + (float)random(-100, 100) / 1000000;
   airplanesClient.updateData(randomLat, randomLon, RADIUS);
 
   readyForAirplaneUpdate = false;
@@ -472,28 +476,102 @@ void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int
     lastMessageUpdate = millis();
     counter = (counter + 1) % (sizeof(messages) / sizeof(String));
   }
+
+  int timePerRotation = 1000;
+  int angle = ((millis() % timePerRotation) * 360) / timePerRotation;
+  drawHeading(display, 10 + x, 10 + y, -angle, 8);
+  drawHeading(display, 10 + x, 42 + y, angle, 8);
+  drawHeading(display, 118 + x, 10 + y, angle, 8);
+  drawHeading(display, 118 + x, 42 + y, -angle, 8);
+}
+
+int16_t *calculateLineCoords(int16_t x2, int16_t y2, float angle, int16_t length)
+{
+  static int16_t coords[4];
+
+  int16_t halfLength = length / 2;
+
+  coords[0] = x2 - (int16_t)(halfLength * sin(angle)); // First endpoint x0
+  coords[1] = y2 + (int16_t)(halfLength * cos(angle)); // First endpoint y0
+
+  coords[2] = x2 + (int16_t)(halfLength * sin(angle)); // Second endpoint x1
+  coords[3] = y2 - (int16_t)(halfLength * cos(angle)); // Second endpoint y1
+
+  return coords;
 }
 
 void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius)
 {
-  int diff = 40;
-  int degrees[] = {0, 180 - diff / 2, 180 + diff / 2, 0};
-  display->drawCircle(x, y, radius + 2);
-  for (int i = 0; i < 3; i++)
+  display->drawCircle(x, y, radius);
+
+  for (int i = 0; i < 360; i += 45)
   {
-    int x1 = cos((-450 + (heading + degrees[i])) * pi / 180.0) * radius + x;
-    int y1 = sin((-450 + (heading + degrees[i])) * pi / 180.0) * radius + y;
-    int x2 = cos((-450 + (heading + degrees[i + 1])) * pi / 180.0) * radius + x;
-    int y2 = sin((-450 + (heading + degrees[i + 1])) * pi / 180.0) * radius + y;
-    display->drawLine(x1, y1, x2, y2);
+    float rad = i * DEG2RAD;
+    int16_t cx = x + (int16_t)(radius * sin(rad));
+    int16_t cy = y - (int16_t)(radius * cos(rad));
+    int16_t *markCoords = calculateLineCoords(cx, cy, rad, 3);
+    display->drawLine(markCoords[0], markCoords[1], markCoords[2], markCoords[3]);
   }
+
+  int16_t *coords = calculateLineCoords(x, y, heading * DEG2RAD, radius * 2 - 6);
+  drawArrow(display, coords[0], coords[1], coords[2], coords[3]);
 }
 
-String formatFlightLevel(int ft)
+void drawArrow(OLEDDisplay *display, int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-  return ft < 8000
-             ? (String(ft) + "ft")
-             : ("FL" + String(ft / 100));
+  int size = 5;
+  // Draw the line
+  display->drawLine(x0, y0, x1, y1);
+
+  // Calculate vector along the line
+  int16_t dx = x1 - x0;
+  int16_t dy = y1 - y0;
+
+  // Length of the line
+  float length = sqrt(dx * dx + dy * dy);
+
+  // Scale factors to get unit vector in the direction of the line
+  float unitX = dx / length;
+  float unitY = dy / length;
+
+  // Points for the arrowhead triangle base
+  int16_t x2 = x1 - (int16_t)(size * unitX); // Base of the arrowhead along the line
+  int16_t y2 = y1 - (int16_t)(size * unitY);
+
+  // Perpendicular vector to the line (for arrowhead width)
+  int16_t perpX = (int16_t)(unitY * (size / 2));
+  int16_t perpY = (int16_t)(unitX * (size / 2));
+
+  // Calculate the two other points of the triangle
+  int16_t x3 = x2 + perpX;
+  int16_t y3 = y2 - perpY;
+
+  int16_t x4 = x2 - perpX;
+  int16_t y4 = y2 + perpY;
+
+  // Draw the arrowhead (filled triangle)
+  display->fillTriangle(x1, y1, x3, y3, x4, y4);
+}
+
+void drawAltitude(OLEDDisplay *display, int x, int y, AirplaneData airplane)
+{
+  String altString = airplane.alt_baro < 8000
+                         ? (String(airplane.alt_baro) + "ft")
+                         : ("FL" + String(airplane.alt_baro / 100));
+
+  display->drawString(x, y, altString);
+
+  if (abs(airplane.baro_rate) < 50)
+    return;
+
+  int offset = display->getStringWidth(altString) + 6;
+  bool isUp = airplane.baro_rate > 0;
+
+  int y1 = 2 + y;
+  int y2 = 16 + y;
+  drawArrow(display, x + offset,
+            isUp ? y1 : y2, x + offset,
+            isUp ? y2 : y1);
 }
 
 void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
@@ -507,13 +585,12 @@ void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
 
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
-  display->drawString(x, y, "Typ:");
-  display->drawString(x, 26 + y, "Znaki:");
+  display->drawString(x, y, "Znaki:");
+  display->drawStringMaxWidth(x, 28 + y, 128, desc);
   display->setFont(ArialMT_Plain_16);
-  display->drawString(x, 10 + y, desc);
-  display->drawString(x, 36 + y, airplane.r);
+  display->drawString(x, 10 + y, airplane.r);
 
-  drawHeading(display, x + 112, y + 40, airplane.track, 10);
+  drawHeading(display, x + 114, 15 + y, airplane.track, 13);
 }
 
 void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
@@ -531,7 +608,7 @@ void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
   display->drawString(66 + x, 27 + y, "Predkosc:");
   display->setFont(ArialMT_Plain_16);
   display->drawString(x, 10 + y, String(airplane.distance, 0) + "km");
-  display->drawString(x, 37 + y, formatFlightLevel(airplane.alt_baro));
+  drawAltitude(display, x, 36 + y, airplane);
   display->drawString(66 + x, 10 + y, String(airplane.track) + "°");
   display->drawString(66 + x, 37 + y, String(airplane.gs) + "kts");
 }
