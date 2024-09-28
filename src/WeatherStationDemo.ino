@@ -53,7 +53,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.7"
+#define FW_VER "v@1.1.8"
 
 /***************************
  * Begin Settings
@@ -519,7 +519,7 @@ void drawHeading(OLEDDisplay *display, int x, int y, double heading, int radius)
 
 void drawArrow(OLEDDisplay *display, int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-  int size = 5;
+  int size = 6;
   // Draw the line
   display->drawLine(x0, y0, x1, y1);
 
@@ -567,8 +567,8 @@ void drawAltitude(OLEDDisplay *display, int x, int y, AirplaneData airplane)
   int offset = display->getStringWidth(altString) + 6;
   bool isUp = airplane.baro_rate > 0;
 
-  int y1 = 2 + y;
-  int y2 = 16 + y;
+  int y1 = 3 + y;
+  int y2 = 15 + y;
   drawArrow(display, x + offset,
             isUp ? y1 : y2, x + offset,
             isUp ? y2 : y1);
@@ -582,15 +582,18 @@ void drawAirplane1(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
   const AirplaneData &airplane = airplanesClient.getVisibleAircraft();
 
   String desc = airplane.desc.length() > 0 ? airplane.desc : airplane.t;
+  bool hasFlight = airplane.flight.length() > 0;
 
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
   display->drawString(x, y, "Znaki:");
+  if (hasFlight)
+    display->drawString(66 + x, y, "Nr lotu:");
   display->drawStringMaxWidth(x, 28 + y, 128, desc);
   display->setFont(ArialMT_Plain_16);
   display->drawString(x, 10 + y, airplane.r);
-
-  drawHeading(display, x + 114, 15 + y, airplane.track, 13);
+  if (hasFlight)
+    display->drawString(66 + x, 10 + y, airplane.flight);
 }
 
 void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
@@ -610,6 +613,7 @@ void drawAirplane2(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
   display->drawString(x, 10 + y, String(airplane.distance, 0) + "km");
   drawAltitude(display, x, 36 + y, airplane);
   display->drawString(66 + x, 10 + y, String(airplane.track) + "°");
+  drawHeading(display, x + 115, 14 + y, airplane.track, 12);
   display->drawString(66 + x, 37 + y, String(airplane.gs) + "kts");
 }
 
