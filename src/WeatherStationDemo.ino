@@ -52,7 +52,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.2.2"
+#define FW_VER "v@1.2.3"
 
 /***************************
  * Begin Settings
@@ -145,7 +145,6 @@ void configModeCallback(WiFiManager *myWiFiManager);
 void drawProgress(OLEDDisplay *display, int percentage, String label);
 void updateData(OLEDDisplay *display);
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
-void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void drawForecast(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y);
 void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex);
@@ -170,7 +169,7 @@ IRAM_ATTR void onSelectButtonPress();
 // Add frames
 // this array keeps function pointers to all frames
 // frames are the single views that slide from right to left
-FrameCallback framesNormal[] = {drawDateTime, drawCurrentWeather, drawForecast, drawMessage};
+FrameCallback framesNormal[] = {drawDateTime, drawCurrentWeather, drawForecast};
 FrameCallback framesAirplane[] = {drawDateTime, drawAirplane1, drawAirplane2, drawCurrentWeather, drawForecast};
 
 OverlayCallback overlays[] = {drawHeaderOverlay};
@@ -200,6 +199,9 @@ void setup()
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setContrast(255);
 
+  display.drawString(64, 22, "Lacze sie z WiFi");
+  display.display();
+
   // WiFiManager
   // Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
@@ -209,10 +211,6 @@ void setup()
 
   // or use this for auto generated name ESP + ChipID
   wifiManager.autoConnect();
-
-  // Initiate OTA
-  OTADRIVE.setInfo(APIKEY, FW_VER);
-  OTADRIVE.onUpdateFirmwareProgress(onUpdateProgress);
 
   // Manual Wifi
   // WiFi.begin(WIFI_SSID, WIFI_PWD);
@@ -239,6 +237,10 @@ void setup()
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
 
   autoBrightness(&display);
+
+  // Initiate OTA
+  OTADRIVE.setInfo(APIKEY, FW_VER);
+  OTADRIVE.onUpdateFirmwareProgress(onUpdateProgress);
 
   ui.setTargetFPS(60);
 
@@ -480,32 +482,6 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state)
     display->drawVerticalLine(29, 58, 5);
     display->drawVerticalLine(32, 58, 5);
   }
-}
-
-int counter = 0;
-unsigned long lastMessageUpdate = millis();
-unsigned long updateMessageEvery = 1000;
-String messages[] = {"Swieci slonce", "Pada cieply deszcz", "Jest tecza", "Nie ma burzy", "Jest cieplo"};
-
-void drawMessage(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
-{
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->setFont(ArialMT_Plain_10);
-  display->drawString(64 + x, 9 + y, "Z Toba zawsze");
-  display->drawString(64 + x, 24 + y, messages[counter]);
-
-  if ((millis() - lastMessageUpdate) > updateMessageEvery)
-  {
-    lastMessageUpdate = millis();
-    counter = (counter + 1) % (sizeof(messages) / sizeof(String));
-  }
-
-  int timePerRotation = 1000;
-  int angle = ((millis() % timePerRotation) * 360) / timePerRotation;
-  drawHeading(display, 10 + x, 10 + y, -angle, 8);
-  drawHeading(display, 10 + x, 42 + y, angle, 8);
-  drawHeading(display, 118 + x, 10 + y, angle, 8);
-  drawHeading(display, 118 + x, 42 + y, -angle, 8);
 }
 
 int16_t *calculateLineCoords(int16_t x2, int16_t y2, float angle, int16_t length)
