@@ -52,7 +52,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.2.3"
+#define FW_VER "v@1.2.6"
 
 /***************************
  * Begin Settings
@@ -199,15 +199,18 @@ void setup()
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setContrast(255);
 
-  display.drawString(64, 22, "Lacze sie z WiFi");
+  display.drawString(64, 22, "Lacze sie z WiFi...");
   display.display();
 
   // WiFiManager
   // Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
   // Uncomment for testing wifi manager
-  // wifiManager.resetSettings();
+  wifiManager.setConnectTimeout(10);
   wifiManager.setAPCallback(configModeCallback);
+
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
 
   // or use this for auto generated name ESP + ChipID
   wifiManager.autoConnect();
@@ -239,6 +242,9 @@ void setup()
   autoBrightness(&display);
 
   // Initiate OTA
+  display.clear();
+  display.drawString(64, 22, "Sprawdzam aktualizacje...");
+  display.display();
   OTADRIVE.setInfo(APIKEY, FW_VER);
   OTADRIVE.onUpdateFirmwareProgress(onUpdateProgress);
 
@@ -627,7 +633,7 @@ void configModeCallback(WiFiManager *myWiFiManager)
   display.setFont(ArialMT_Plain_10);
   display.drawString(64, 10, "Polacz sie z hotspotem");
   display.drawString(64, 25, myWiFiManager->getConfigPortalSSID());
-  display.drawString(64, 40, "aby skonfigurowac urzadzenie");
+  display.drawString(64, 40, "aby skonfigurowac WiFi");
   display.display();
 }
 
