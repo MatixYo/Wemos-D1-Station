@@ -11,3 +11,5 @@ const int RADIUS = 15;
 
 const int UPDATE_INTERVAL_SECS = 20 * 60;      // Update every 20 minutes
 const int UPDATE_AIRPLANES_INTERVAL_SECS = 60; // Every minute
+
+const boolean ENABLE_OTA = false;

@@ -23,7 +23,6 @@ SOFTWARE.
 See more at https://thingpulse.com
 */
 
-#include <Arduino.h>
 #include <config.h>
 
 #if defined(ESP8266)
@@ -53,7 +52,7 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.1.8"
+#define FW_VER "v@1.2.2"
 
 /***************************
  * Begin Settings
@@ -71,6 +70,12 @@ const int SDC_PIN = D1;
 const int SDA_PIN = 5; // D3;
 const int SDC_PIN = 4; // D4;
 #endif
+
+// Buttons Settings
+const int BUTTON_PREV = D7;
+const int BUTTON_SELECT = D6;
+const int BUTTON_NEXT = D5;
+
 // OpenWeatherMap Settings
 // Sign up here to get an API key:
 // https://docs.thingpulse.com/how-tos/openweathermap-key/
@@ -93,8 +98,6 @@ at the end is what you assign to the constant below.
 const uint8_t MAX_FORECASTS = 4;
 
 const boolean IS_METRIC = true;
-
-const boolean DISABLE_OTA = false;
 
 // Adjust according to your language
 const String WDAY_NAMES[] = {"NIE", "PON", "WTO", "SRO", "CZW", "PIA", "SOB"};
@@ -135,6 +138,8 @@ long timeSinceLastAUpdate = 0;
 
 int hadAirplanes = -1;
 
+bool autoTransition = true;
+
 // declaring prototypes
 void configModeCallback(WiFiManager *myWiFiManager);
 void drawProgress(OLEDDisplay *display, int percentage, String label);
@@ -158,6 +163,10 @@ String replaceChars(String input);
 void updateDisplayedFrames();
 void otaUpdate();
 
+IRAM_ATTR void onNextButtonPress();
+IRAM_ATTR void onPrevButtonPress();
+IRAM_ATTR void onSelectButtonPress();
+
 // Add frames
 // this array keeps function pointers to all frames
 // frames are the single views that slide from right to left
@@ -169,6 +178,14 @@ int numberOfOverlays = 1;
 
 void setup()
 {
+  pinMode(BUTTON_PREV, INPUT_PULLUP);
+  pinMode(BUTTON_SELECT, INPUT_PULLUP);
+  pinMode(BUTTON_NEXT, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PREV), onPrevButtonPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_SELECT), onSelectButtonPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_NEXT), onNextButtonPress, RISING);
+
   Serial.begin(115200);
   Serial.println();
   Serial.println();
@@ -457,6 +474,12 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState *state)
   String temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
   display->drawString(128, 54, temp);
   display->drawHorizontalLine(0, 55, 128);
+
+  if (!autoTransition)
+  {
+    display->drawVerticalLine(29, 58, 5);
+    display->drawVerticalLine(32, 58, 5);
+  }
 }
 
 int counter = 0;
@@ -626,16 +649,16 @@ void configModeCallback(WiFiManager *myWiFiManager)
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setFont(ArialMT_Plain_10);
-  display.drawString(64, 10, "Prosze sie polaczyc z WiFi");
+  display.drawString(64, 10, "Polacz sie z hotspotem");
   display.drawString(64, 25, myWiFiManager->getConfigPortalSSID());
-  display.drawString(64, 40, "aby sie polaczyc z pogoda");
+  display.drawString(64, 40, "aby skonfigurowac urzadzenie");
   display.display();
 }
 
 void otaUpdate()
 {
   // Every 1h
-  if (!OTADRIVE.timeTick(3600) || DISABLE_OTA)
+  if (!OTADRIVE.timeTick(3600) || !ENABLE_OTA)
     return;
   Serial.println("Checking for updates");
   auto inf = OTADRIVE.updateFirmwareInfo();
@@ -670,4 +693,28 @@ String replaceChars(String input)
     }
   }
   return input; // Return the modified string
+}
+
+// Interupts
+IRAM_ATTR void onNextButtonPress()
+{
+  ui.nextFrame();
+}
+
+IRAM_ATTR void onPrevButtonPress()
+{
+  ui.previousFrame();
+}
+
+IRAM_ATTR void onSelectButtonPress()
+{
+  autoTransition = !autoTransition;
+  if (autoTransition)
+  {
+    ui.enableAutoTransition();
+  }
+  else
+  {
+    ui.disableAutoTransition();
+  }
 }
