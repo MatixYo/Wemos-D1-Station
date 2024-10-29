@@ -52,14 +52,11 @@ See more at https://thingpulse.com
 
 #include <AirplanesLiveClient.h>
 
-#define FW_VER "v@1.2.6"
+#define FW_VER "v@1.2.7"
 
 /***************************
  * Begin Settings
  **************************/
-
-#define TZ 1      // (utc+) TZ in hours
-#define DST_MN 60 // use 60mn for summer time in some countries
 
 // Display Settings
 const int I2C_DISPLAY_ADDRESS = 0x3c;
@@ -120,10 +117,6 @@ OpenWeatherMapForecastData forecasts[MAX_FORECASTS];
 OpenWeatherMapForecast forecastClient;
 
 AirplanesLiveClient airplanesClient;
-
-#define TZ_MN ((TZ) * 60)
-#define TZ_SEC ((TZ) * 3600)
-#define DST_SEC ((DST_MN) * 60)
 
 time_t now;
 
@@ -237,7 +230,7 @@ void setup()
   };
 
   // Get time from network time service
-  configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
+  configTime(TZ, "pool.ntp.org", "time.nist.gov");
 
   autoBrightness(&display);
 

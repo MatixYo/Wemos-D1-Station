@@ -1,3 +1,6 @@
+#include <Arduino.h>
+
+#define TZ "CET-1CEST,M3.5.0/2,M10.5.0/3" // Warsaw/Poland
 #define HOSTNAME "ESP8266-OTA-"
 #define APIKEY ""
 #define OPEN_WEATHER_MAP_APP_ID ""
